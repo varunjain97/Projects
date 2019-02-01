@@ -1,0 +1,88 @@
+library(pROC)
+library(caTools)
+
+#Set working directory
+setwd("E:/rWork/Muit work/rproject1/Git Hub/Titanic Case Study")
+
+# Importing Training data
+data<- read.csv("train.csv")
+str(data)
+
+#check missing values
+colSums(is.na(data))  
+colSums(data == "")
+
+# Remove Cabin,Name and ticket columns
+cols = c("Cabin","Name","Ticket")
+data = data[-which(names(data) %in% cols)]
+
+
+###### DATA TREATMENT #########
+#Missing Values treatment
+data = data[-which(is.na(data$Age)),]
+
+# Outlier Treatment----
+boxplot(data$PassengerId)
+
+#From age column
+boxplot(data$Age)
+summary(data$Age)
+#Remove Outlier from age by mean + (Q3-Q1)*1.5
+data = data[-which(data$Age > 57),]
+boxplot(data$Age)
+
+
+boxplot(data$SibSp)
+boxplot(data$Parch)
+
+# From Fare column
+boxplot(data$Fare)
+summary(data$Fare)
+data = data[-which(data$Fare > 75),]
+boxplot(data$Fare)
+summary(data$Fare)
+data = data[-which(data$Fare > 46.5),]
+boxplot(data$Fare)
+
+# Divided data into 2 parts
+set.seed(123)
+split = sample.split(data$Survived, SplitRatio = 0.75)
+training_set = subset(data, split == TRUE)
+test_set = subset(data, split == FALSE)
+
+# Modelling
+# Iteration -- 1
+classifier = glm(Survived ~ .,data = training_set)
+summary(classifier)
+
+# Iteration 2 -- Fare Removed
+classifier = glm(Survived ~ .,data = training_set[-c(8)])
+summary(classifier)
+
+# Iteration 2 -- Embarked Removed
+classifier = glm(Survived ~ .,data = training_set[-c(8,9)])
+summary(classifier)
+
+# Iteration 2 -- PassengerID Removed
+classifier = glm(Survived ~ .,data = training_set[-c(1,8,9)])
+summary(classifier)
+
+# Iteration 2 -- Parch Removed
+classifier = glm(Survived ~ .,data = training_set[-c(1,7,8,9)])
+summary(classifier)
+
+#Prediction on test data
+pred = predict(classifier,type = "response",newdata = test_set)
+rocCurve   <- roc(response = test_set$Survived, predictor = pred, 
+                  levels = rev(unique(test_set$Survived)))
+data$Survived <- as.factor(data$Survived)
+#Metrics - Fit Statistics
+predclass <-ifelse(pred>coords(rocCurve,"best")[1],1,0)
+Confusion <- table(Predicted = predclass,Actual = test_set$Survived)
+Confusion
+# 83% accuracy
+
+df = read.csv("test.csv")
+colSums(is.na(df))
+df$Age[is.na(df$Age)] = mean(df$Age[!is.na(df$Age)])
+df$Survived = predict(classifier,type = "response",newdata = df)
