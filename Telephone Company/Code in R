@@ -1,0 +1,128 @@
+df <- read.csv("E:/rWork/2018/Varun/Logistic Regression 2/Telco-Customer-Churn.csv")
+#View(df)
+
+#Variable Treatment
+#gender
+table(df$gender)
+df$gender = ifelse(df$gender == "Male",1,0)
+
+#Senior_citizen
+table(df$SeniorCitizen)
+
+#Partner
+table(df$Partner)
+df$Partner = ifelse(df$Partner == "Yes",1,0)
+
+#Dependents
+table(df$Dependents)
+df$Dependents = ifelse(df$Dependents == "Yes",1,0)
+
+#Tenure
+unique(df$tenure)
+
+#PhoneSercice
+table(df$PhoneService)
+df$PhoneService = ifelse(df$PhoneService == "Yes",1,0)
+#df = df[-c(which(df$PhoneService == 0)),]
+#df = df[-6]
+
+#Multiple Lines
+table(df$MultipleLines)
+df$MultipleLines = ifelse(df$MultipleLines == "Yes",1,0)
+
+#InternetService
+table(df$InternetService)
+df$InternetService = ifelse(df$InternetService == "No",0,1)
+#df = df[-7]
+
+#Online Security
+table(df$OnlineSecurity)
+#df = df[-which(df$OnlineSecurity == "No internet service"),]
+df$OnlineSecurity = ifelse(df$OnlineSecurity == "Yes",1,0)
+
+# Online Backup
+table(df$OnlineBackup)
+df$OnlineBackup = ifelse(df$OnlineBackup == "Yes",1,0)
+
+#Device Protection
+table(df$DeviceProtection)
+df$DeviceProtection = ifelse(df$DeviceProtection == "Yes",1,0)
+
+#TechSupport
+table(df$TechSupport)
+df$TechSupport = ifelse(df$TechSupport == "Yes",1,0)
+
+#Streaming TV
+table(df$StreamingTV)
+df$StreamingTV = ifelse(df$StreamingTV == "Yes",1,0)
+
+#Streaming Movies
+table(df$StreamingMovies)
+df$StreamingMovies = ifelse(df$StreamingMovies == "Yes",1,0)
+
+#Contract
+table(df$Contract)
+df$Contract =as.factor(df$Contract)
+
+#Paperlessbilling
+table(df$PaperlessBilling)
+df$PaperlessBilling = ifelse(df$PaperlessBilling == "Yes",1,0)
+
+#payment Method
+table(df$PaymentMethod)
+df$PaymentMethod = as.factor(df$PaymentMethod)
+
+#Monthly Charges
+which(is.na(df$MonthlyCharges))
+
+#Total Chargse
+which(is.na(df$TotalCharges))
+mean(df$TotalCharges[-which(is.na(df$TotalCharges))])
+df$TotalCharges[is.na(df$TotalCharges)] = 2283.3
+# Churn
+table(df$Churn)
+
+
+library(caTools)
+set.seed(123)
+split = sample.split(df$Churn, SplitRatio = 0.75)
+training_set = subset(df, split == TRUE)
+test_set = subset(df, split == FALSE)
+
+classifier = glm(formula = Churn ~ .,
+                 family = binomial,
+                 data = training_set)
+summary(classifier)
+
+colnames(df)
+
+# classifier = glm(formula = Churn ~ .,
+#                  family = binomial,
+#                  data = training_set[,-c(1,3,8,13,14,17)])
+# summary(classifier)
+# 
+# prob_pred = predict(classifier, type = 'response', 
+#                     newdata = test_set[,-c(1,3,8,13,14,17)])
+# y_pred = ifelse(prob_pred > 0.5, 1, 0)
+# 
+# table(test_set$Churn,y_pred)
+
+
+#https://data.library.virginia.edu/visualizing-the-effects-of-logistic-regression/
+
+classifier_1 = glm(formula = Churn ~ .,
+                   family = binomial,
+                   data = training_set[,-c(1,2,3,8,13,14,17)])
+summary(classifier_1)
+
+prob_pred1 = predict(classifier_1, type = 'response', 
+                     newdata = test_set[,-c(1,3,8,13,14,17)])
+y_pred1 = ifelse(prob_pred1 > 0.5, 1, 0)
+
+t = table(y_pred1,test_set$Churn)
+accuracy = diag(t)/sum(t)
+sum(accuracy)
+
+# Roc curve
+auc = auc(test_set$Churn,prob_pred1)
+plot(roc(test_set$Churn,prob_pred1),main = "ROC Curve")
