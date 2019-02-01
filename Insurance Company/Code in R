@@ -1,0 +1,210 @@
+library(boot) 
+library(car)
+library(QuantPsyc)
+library(lmtest)
+library(sandwich)
+library(vars)
+library(nortest)
+library(stringr)
+library(MASS)
+
+#remove environment
+rm(list = ls())
+
+#set new working directory
+setwd("E:/rWork/2018/Varun/4-Insurence Company")
+
+# Import data from Excel
+library(readxl)
+df = read_excel("Insurance_Marketing-Customer-Value-Analysis.xlsx")
+#View(df)
+
+# check missing values
+colSums(is.na(df))  # there is no missing value
+#anyNA(df)  other command to check missing value
+
+#Variable treatment----
+#state
+unique(df$State)
+table(df$State)
+df$State = as.factor(df$State)
+
+#Customer Lifetime value
+summary(df$`Customer Lifetime Value`)
+boxplot(df$`Customer Lifetime Value`)
+#Outlier remove  mean + (Q3 - Q1)*1.5
+df$`Customer Lifetime Value` = ifelse(df$`Customer Lifetime Value` > 15457,8005,
+                                      df$`Customer Lifetime Value`)
+boxplot(df$`Customer Lifetime Value`)
+summary(df$`Customer Lifetime Value`)
+df$`Customer Lifetime Value` = ifelse(df$`Customer Lifetime Value` > 12367,6351,
+                                      df$`Customer Lifetime Value`)
+boxplot(df$`Customer Lifetime Value`)
+
+#Response
+unique(df$Response)
+df$Response = ifelse(df$Response == "Yes",1,0)
+
+#Coverage
+unique(df$Coverage)
+df$Coverage = as.factor(df$Coverage) 
+
+#Education
+unique(df$Education)
+df$Education = factor(df$Education,
+                      levels = c("High School or Below","Bachelor","College","Master","Doctor"),
+                      labels = c(0,1,1,1,2))
+df$Education = as.numeric(df$Education)
+
+#Effective TO Date
+months = strftime(df$`Effective To Date`,"%m")
+df$month = as.numeric(months)
+
+days = strftime(df$`Effective To Date`,"%d")
+df$day = as.numeric(days)
+df$`Effective To Date` = NULL
+
+#EmploymentStatus
+unique(df$EmploymentStatus)
+df$EmploymentStatus = ifelse(df$EmploymentStatus == "Unemployed",0,1)
+
+#Gender
+unique(df$Gender)
+df$Gender  = ifelse(df$Gender == "M",1,0)
+
+#INcome
+summary(df$Income)
+boxplot(df$Income)
+
+#Location code
+unique(df$`Location Code`)
+
+#Marital Status
+df$`Marital Status` = ifelse(df$`Marital Status` == "Married",1,0)
+
+#Monthly Premium
+summary(df$`Monthly Premium Auto`)
+boxplot(df$`Monthly Premium Auto`)
+df$`Monthly Premium Auto` = ifelse(df$`Monthly Premium Auto` > 154,93,df$`Monthly Premium Auto`)
+
+#months since last claim
+summary(df$`Months Since Last Claim`) 
+boxplot(df$`Months Since Last Claim`)
+
+#months since policy inception
+summary(df$`Months Since Policy Inception`)
+boxplot(df$`Months Since Policy Inception`)
+
+#number of open complaints
+summary(df$`Number of Open Complaints`)
+boxplot(df$`Number of Open Complaints`)
+table(df$`Number of Open Complaints`)
+df$`Number of Open Complaints` = NULL
+
+#number of policies
+summary(df$`Number of Policies`)
+boxplot(df$`Number of Policies`)
+df$`Number of Policies` = ifelse(df$`Number of Policies` > 7.5,7,df$`Number of Policies`)
+
+#Policy Type
+table(df$`Policy Type`)
+
+#Policy 
+table(df$Policy)
+df$Policy = str_sub(df$Policy,-1,-1)
+
+
+#Renew offer type
+table(df$`Renew Offer Type`)
+df$`Renew Offer Type` = str_sub(df$`Renew Offer Type`,-1)
+
+#Sales channel
+table(df$`Sales Channel`)
+
+#Total claim amount
+summary(df$`Total Claim Amount`)
+boxplot(df$`Total Claim Amount`)
+length(which(df$`Total Claim Amount` > 434 + (547.51-272.258)*1.5))
+df$`Total Claim Amount` = ifelse(df$`Total Claim Amount` > 847,434,df$`Total Claim Amount`)
+
+#Vehicle Class
+table(df$`Vehicle Class`)
+df$`Vehicle Class` = factor(df$`Vehicle Class`,
+                            levels = c("Luxury Car","Luxury SUV","Sports Car","Four-Door Car","SUV","Two-Door Car"),
+                            labels = c(3,3,3,2,2,1))
+df$`Vehicle Class` = as.numeric(df$`Vehicle Class`)
+
+#Vehicle size 
+table(df$`Vehicle Size`)
+df$`Vehicle Size` = factor(df$`Vehicle Size`,
+                           levels = c("Large","Medsize","Small"),
+                           c(3,2,1))
+df$`Vehicle Size` = as.numeric(df$`Vehicle Size`)
+
+#modeling----
+df$`Number of Policies` = log(df$`Number of Policies`)
+df$`Customer Lifetime Value` = log(df$`Customer Lifetime Value`)
+df$`Monthly Premium Auto` = log(df$`Monthly Premium Auto`)
+
+# Dividing data into test and train
+library(caTools)
+set.seed(123)
+split = sample.split(df$`Customer Lifetime Value`,SplitRatio = 0.8)
+train = subset(df,split == TRUE)
+test = subset(df,split == F)
+
+#Modeling-----
+colnames(train)
+
+#model 1
+regg = lm(formula =  `Customer Lifetime Value` ~ . ,
+          data = train[-1])
+summary(regg)
+#R-squared 0.491 and 0.03009
+
+#model2
+regg = lm(formula =  `Customer Lifetime Value` ~ . ,
+          data = train[-c(1,2,4,8,10,11,13,14,16,17,19,20,22,24)])
+summary(regg)
+#R-squared 0.4897 and mape 0.03009
+
+#model3
+regg = lm(formula =  `Customer Lifetime Value` ~ . ,
+          data = train[-c(1,2,4,6,8,9,10,11,13,14,16,17,18,19,20,22,23,24)])
+summary(regg)
+#R-squared 0.4888 and mape 0.03016
+
+#Get the pridiction of fitted value
+pred = predict(regg,newdata = test[-1])
+test$pred = pred
+Error = test$`Customer Lifetime Value` - test$pred
+
+#Calculating MAPE
+(sum((abs(test$`Customer Lifetime Value`-test$pred))/test$`Customer Lifetime Value`))/nrow(test)
+
+##################################### Checking of Assumption ############################################
+
+# residuals should be uncorrelated ##Autocorrelation
+# Null H0: residuals from a linear regression are uncorrelated. Value should be close to 2. 
+#Less than 1 and greater than 3 -> concern
+## Should get a high p value
+
+dwt(regg)
+
+# Checking multicollinearity
+vif(regg) # should be within 2. If it is greater than 10 then serious problem
+
+################ Constant error variance ##########Heteroscedasticity
+
+
+# Breusch-Pagan test
+bptest(regg)  # Null hypothesis -> error is homogenious (p value should be more than 0.05)
+
+
+## Normality testing Null hypothesis is data is normal.
+resids = regg$residuals
+
+ad.test(resids)  #Anderson-Darling test for normality
+# P- value is > 0.05
+
+
